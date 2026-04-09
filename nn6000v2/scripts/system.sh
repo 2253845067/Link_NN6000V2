@@ -18,7 +18,7 @@ fix_default_set() {
 
 fix_miniupnpd() {
     local miniupnpd_dir="$BUILD_DIR/feeds/packages/net/miniupnpd"
-    local patch_file="999-chanage-default-leaseduration.patch"
+    local patch_file="999-change-default-leaseduration.patch"
 
     if [ -d "$miniupnpd_dir" ] && [ -f "$BASE_PATH/patches/$patch_file" ]; then
         install -Dm644 "$BASE_PATH/patches/$patch_file" "$miniupnpd_dir/patches/$patch_file"
@@ -53,33 +53,6 @@ update_default_lan_addr() {
     fi
 }
 
-remove_something_nss_kmod() {
-    local ipq_mk_path="$BUILD_DIR/target/linux/qualcommax/Makefile"
-    local target_mks=("$BUILD_DIR/target/linux/qualcommax/ipq60xx/target.mk" "$BUILD_DIR/target/linux/qualcommax/ipq807x/target.mk")
-
-    for target_mk in "${target_mks[@]}"; do
-        if [ -f "$target_mk" ]; then
-            sed -i 's/kmod-qca-nss-crypto//g' "$target_mk"
-        fi
-    done
-
-    if [ -f "$ipq_mk_path" ]; then
-        sed -i '/kmod-qca-nss-drv-eogremgr/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-gre/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-map-t/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-match/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-mirror/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-tun6rd/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-tunipip6/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-vxlanmgr/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-drv-wifi-meshmgr/d' "$ipq_mk_path"
-        sed -i '/kmod-qca-nss-macsec/d' "$ipq_mk_path"
-
-        sed -i 's/automount //g' "$ipq_mk_path"
-        sed -i 's/cpufreq //g' "$ipq_mk_path"
-    fi
-}
-
 update_affinity_script() {
     local affinity_script_dir="$BUILD_DIR/target/linux/qualcommax"
 
@@ -99,47 +72,6 @@ fix_hash_value() {
     if [ -f "$makefile_path" ]; then
         sed -i "s/$old_hash/$new_hash/g" "$makefile_path"
         echo "已修正 $package_name 的哈希值。"
-    fi
-}
-
-update_ath11k_fw() {
-    local makefile="$BUILD_DIR/package/firmware/ath11k-firmware/Makefile"
-    local new_mk="$BASE_PATH/patches/ath11k_fw.mk"
-    local url="https://raw.githubusercontent.com/VIKINGYFY/immortalwrt/refs/heads/main/package/firmware/ath11k-firmware/Makefile"
-
-    if [ -d "$(dirname "$makefile")" ]; then
-        echo "正在更新 ath11k-firmware Makefile..."
-        if ! curl -fsSL -o "$new_mk" "$url"; then
-            echo "错误：从 $url 下载 ath11k-firmware Makefile 失败" >&2
-            exit 1
-        fi
-        if [ ! -s "$new_mk" ]; then
-            echo "错误：下载的 ath11k-firmware Makefile 为空文件" >&2
-            exit 1
-        fi
-        mv -f "$new_mk" "$makefile"
-    fi
-}
-
-fix_mkpkg_format_invalid() {
-    if [[ $BUILD_DIR =~ "imm-nss" ]]; then
-        if [ -f $BUILD_DIR/feeds/small8/v2ray-geodata/Makefile ]; then
-            sed -i 's/VER)-\$(PKG_RELEASE)/VER)-r\$(PKG_RELEASE)/g' $BUILD_DIR/feeds/small8/v2ray-geodata/Makefile
-        fi
-        if [ -f $BUILD_DIR/feeds/small8/luci-lib-taskd/Makefile ]; then
-            sed -i 's/>=1\.0\.3-1/>=1\.0\.3-r1/g' $BUILD_DIR/feeds/small8/luci-lib-taskd/Makefile
-        fi
-        if [ -f $BUILD_DIR/feeds/small8/luci-app-openclash/Makefile ]; then
-            sed -i 's/PKG_RELEASE:=beta/PKG_RELEASE:=1/g' $BUILD_DIR/feeds/small8/luci-app-openclash/Makefile
-        fi
-        if [ -f $BUILD_DIR/feeds/small8/luci-app-quickstart/Makefile ]; then
-            sed -i 's/PKG_VERSION:=0\.8\.16-1/PKG_VERSION:=0\.8\.16/g' $BUILD_DIR/feeds/small8/luci-app-quickstart/Makefile
-            sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' $BUILD_DIR/feeds/small8/luci-app-quickstart/Makefile
-        fi
-        if [ -f $BUILD_DIR/feeds/small8/luci-app-store/Makefile ]; then
-            sed -i 's/PKG_VERSION:=0\.1\.27-1/PKG_VERSION:=0\.1\.27/g' $BUILD_DIR/feeds/small8/luci-app-store/Makefile
-            sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' $BUILD_DIR/feeds/small8/luci-app-store/Makefile
-        fi
     fi
 }
 
@@ -163,19 +95,6 @@ change_cpuusage() {
     fi
     if [ -d "$BUILD_DIR/target/linux/mediatek" ]; then
         install -Dm755 "$BASE_PATH/patches/hnatusage" "$filogic_sbin_dir/cpuusage"
-    fi
-}
-
-update_tcping() {
-    local tcping_path="$BUILD_DIR/feeds/small8/tcping/Makefile"
-    local url="https://raw.githubusercontent.com/Openwrt-Passwall/openwrt-passwall-packages/refs/heads/main/tcping/Makefile"
-
-    if [ -d "$(dirname "$tcping_path")" ]; then
-        echo "正在更新 tcping Makefile..."
-        if ! curl -fsSL -o "$tcping_path" "$url"; then
-            echo "错误：从 $url 下载 tcping Makefile 失败" >&2
-            exit 1
-        fi
     fi
 }
 
@@ -219,29 +138,6 @@ apply_passwall_tweaks() {
     fi
 }
 
-install_opkg_distfeeds() {
-    local emortal_def_dir="$BUILD_DIR/package/emortal/default-settings"
-    local distfeeds_conf="$emortal_def_dir/files/99-distfeeds.conf"
-
-    if [ -d "$emortal_def_dir" ] && [ ! -f "$distfeeds_conf" ]; then
-        cat <<'EOF' >"$distfeeds_conf"
-src/gz openwrt_base https://downloads.immortalwrt.org/releases/24.10.0/packages/aarch64_cortex-a53/base/
-src/gz openwrt_luci https://downloads.immortalwrt.org/releases/24.10.0/packages/aarch64_cortex-a53/luci/
-src/gz openwrt_packages https://downloads.immortalwrt.org/releases/24.10.0/packages/aarch64_cortex-a53/packages/
-src/gz openwrt_routing https://downloads.immortalwrt.org/releases/24.10.0/packages/aarch64_cortex-a53/routing/
-src/gz openwrt_telephony https://downloads.immortalwrt.org/releases/24.10.0/packages/aarch64_cortex-a53/telephony/
-EOF
-
-        sed -i "/define Package\/default-settings\/install/a\\
-\\t\$(INSTALL_DIR) \$(1)/etc\\n\
-\t\$(INSTALL_DATA) ./files/99-distfeeds.conf \$(1)/etc/99-distfeeds.conf\n" $emortal_def_dir/Makefile
-
-        sed -i "/exit 0/i\\
-[ -f \'/etc/99-distfeeds.conf\' ] && mv \'/etc/99-distfeeds.conf\' \'/etc/opkg/distfeeds.conf\'\n\
-sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" $emortal_def_dir/files/99-default-settings
-    fi
-}
-
 update_nss_pbuf_performance() {
     local pbuf_path="$BUILD_DIR/package/kernel/mac80211/files/pbuf.uci"
     if [ -d "$(dirname "$pbuf_path")" ] && [ -f $pbuf_path ]; then
@@ -258,23 +154,10 @@ set_build_signature() {
 }
 
 update_nss_diag() {
-    local file="$BUILD_DIR/package/kernel/mac80211/files/nss_diag.sh"
-    if [ -d "$(dirname "$file")" ] && [ -f "$file" ]; then
-        \rm -f "$file"
-        install -Dm755 "$BASE_PATH/patches/nss_diag.sh" "$file"
-    fi
-}
-
-update_menu_location() {
-    local samba4_path="$BUILD_DIR/feeds/luci/applications/luci-app-samba4/root/usr/share/luci/menu.d/luci-app-samba4.json"
-    if [ -d "$(dirname "$samba4_path")" ] && [ -f "$samba4_path" ]; then
-        sed -i 's/nas/services/g' "$samba4_path"
-    fi
-
-    local tailscale_path="$BUILD_DIR/feeds/small8/luci-app-tailscale/root/usr/share/luci/menu.d/luci-app-tailscale.json"
-    if [ -d "$(dirname "$tailscale_path")" ] && [ -f "$tailscale_path" ]; then
-        sed -i 's/services/vpn/g' "$tailscale_path"
-    fi
+    local file="$BUILD_DIR/package/base-files/files/usr/bin/nss_diag.sh"
+    mkdir -p "$(dirname "$file")"
+    install -Dm755 "$BASE_PATH/patches/nss_diag.sh" "$file"
+    echo "已安装 nss_diag.sh 到 /usr/bin/"
 }
 
 fix_compile_coremark() {
@@ -313,96 +196,11 @@ update_script_priority() {
     if [ -d "${pbuf_path%/*}" ] && [ -f "$pbuf_path" ]; then
         sed -i 's/START=.*/START=89/g' "$pbuf_path"
     fi
-
-    local mosdns_path="$BUILD_DIR/package/feeds/small8/luci-app-mosdns/root/etc/init.d/mosdns"
-    if [ -d "${mosdns_path%/*}" ] && [ -f "$mosdns_path" ]; then
-        sed -i 's/START=.*/START=94/g' "$mosdns_path"
-    fi
-}
-
-
-fix_quickstart() {
-    local file_path="$BUILD_DIR/feeds/small8/luci-app-quickstart/luasrc/controller/istore_backend.lua"
-    local url="https://gist.githubusercontent.com/puteulanus/1c180fae6bccd25e57eb6d30b7aa28aa/raw/istore_backend.lua"
-    if [ -f "$file_path" ]; then
-        echo "正在修复 quickstart..."
-        if ! curl -fsSL -o "$file_path" "$url"; then
-            echo "错误：从 $url 下载 istore_backend.lua 失败" >&2
-            exit 1
-        fi
-    fi
-}
-
-update_oaf_deconfig() {
-    local conf_path="$BUILD_DIR/feeds/small8/open-app-filter/files/appfilter.config"
-    local uci_def="$BUILD_DIR/feeds/small8/luci-app-oaf/root/etc/uci-defaults/94_feature_3.0"
-    local disable_path="$BUILD_DIR/feeds/small8/luci-app-oaf/root/etc/uci-defaults/99_disable_oaf"
-
-    if [ -d "${conf_path%/*}" ] && [ -f "$conf_path" ]; then
-        sed -i \
-            -e "s/record_enable '1'/record_enable '0'/g" \
-            -e "s/disable_hnat '1'/disable_hnat '0'/g" \
-            -e "s/auto_load_engine '1'/auto_load_engine '0'/g" \
-            "$conf_path"
-    fi
-
-    if [ -d "${uci_def%/*}" ] && [ -f "$uci_def" ]; then
-        sed -i '/\(disable_hnat\|auto_load_engine\)/d' "$uci_def"
-
-        cat >"$disable_path" <<-EOF
-#!/bin/sh
-[ "\$(uci get appfilter.global.enable 2>/dev/null)" = "0" ] && {
-    /etc/init.d/appfilter disable
-    /etc/init.d/appfilter stop
-}
-EOF
-        chmod +x "$disable_path"
-    fi
-}
-
-update_geoip() {
-    local geodata_path="$BUILD_DIR/package/feeds/small8/v2ray-geodata/Makefile"
-    if [ -d "${geodata_path%/*}" ] && [ -f "$geodata_path" ]; then
-        local GEOIP_VER=$(awk -F"=" '/GEOIP_VER:=/ {print $NF}' $geodata_path | grep -oE "[0-9]{1,}")
-        if [ -n "$GEOIP_VER" ]; then
-            local base_url="https://github.com/v2fly/geoip/releases/download/${GEOIP_VER}"
-            local old_SHA256
-            if ! old_SHA256=$(wget -qO- "$base_url/geoip.dat.sha256sum" | awk '{print $1}'); then
-                echo "错误：从 $base_url/geoip.dat.sha256sum 获取旧的 geoip.dat 校验和失败" >&2
-                return 1
-            fi
-            local new_SHA256
-            if ! new_SHA256=$(wget -qO- "$base_url/geoip-only-cn-private.dat.sha256sum" | awk '{print $1}'); then
-                echo "错误：从 $base_url/geoip-only-cn-private.dat.sha256sum 获取新的 geoip-only-cn-private.dat 校验和失败" >&2
-                return 1
-            fi
-            if [ -n "$old_SHA256" ] && [ -n "$new_SHA256" ]; then
-                if grep -q "$old_SHA256" "$geodata_path"; then
-                    sed -i "s|=geoip.dat|=geoip-only-cn-private.dat|g" "$geodata_path"
-                    sed -i "s/$old_SHA256/$new_SHA256/g" "$geodata_path"
-                fi
-            fi
-        fi
-    fi
 }
 
 fix_rust_compile_error() {
     if [ -f "$BUILD_DIR/feeds/packages/lang/rust/Makefile" ]; then
         sed -i 's/download-ci-llvm=true/download-ci-llvm=false/g' "$BUILD_DIR/feeds/packages/lang/rust/Makefile"
-    fi
-}
-
-fix_easytier_lua() {
-    local file_path="$BUILD_DIR/package/feeds/small8/luci-app-easytier/luasrc/model/cbi/easytier.lua"
-    if [ -f "$file_path" ]; then
-        sed -i 's/util.pcdata/xml.pcdata/g' "$file_path"
-    fi
-}
-
-fix_easytier_mk() {
-    local mk_path="$BUILD_DIR/feeds/small8/luci-app-easytier/easytier/Makefile"
-    if [ -f "$mk_path" ]; then
-        sed -i 's/!@(mips||mipsel)/!TARGET_mips \&\& !TARGET_mipsel/g' "$mk_path"
     fi
 }
 
@@ -419,6 +217,21 @@ update_nginx_ubus_module() {
         echo "已更新 nginx-mod-ubus 模块的 SOURCE_DATE, SOURCE_VERSION 和 MIRROR_HASH。"
     else
         echo "错误：未找到 $makefile_path 文件，无法更新 nginx-mod-ubus 模块。" >&2
+    fi
+}
+
+fix_nginx_configure() {
+    local makefile_path="$BUILD_DIR/feeds/packages/net/nginx/Makefile"
+    if [ -f "$makefile_path" ]; then
+        # 移除不支持的 autotools 参数
+        sed -i 's/--target=.*\s//g' "$makefile_path"
+        sed -i 's/--host=.*\s//g' "$makefile_path"
+        sed -i 's/--disable-dependency-tracking\s//g' "$makefile_path"
+        sed -i 's/--program-prefix=.*\s//g' "$makefile_path"
+        sed -i 's/--program-suffix=.*\s//g' "$makefile_path"
+        echo "已修复 nginx 配置参数，移除不支持的 autotools 选项。"
+    else
+        echo "错误：未找到 $makefile_path 文件，无法修复 nginx 配置。" >&2
     fi
 }
 
@@ -439,115 +252,50 @@ fix_opkg_check() {
     fi
 }
 
-install_pbr_cmcc() {
+install_pbr_isp() {
     local pbr_pkg_dir="$BUILD_DIR/package/feeds/packages/pbr"
     local pbr_dir="$pbr_pkg_dir/files/usr/share/pbr"
     local pbr_conf="$pbr_pkg_dir/files/etc/config/pbr"
     local pbr_makefile="$pbr_pkg_dir/Makefile"
+    local pbr_init_script="$pbr_pkg_dir/files/etc/init.d/pbr"
 
     if [ -d "$pbr_pkg_dir" ]; then
-        echo "正在安装 PBR CMCC 配置文件..."
-        install -Dm644 "$BASE_PATH/patches/pbr.user.cmcc" "$pbr_dir/pbr.user.cmcc"
-        install -Dm644 "$BASE_PATH/patches/pbr.user.cmcc6" "$pbr_dir/pbr.user.cmcc6"
+        echo "正在安装 PBR 多 ISP 自动识别脚本..."
+        install -Dm755 "$BASE_PATH/patches/pbr.user.isp" "$pbr_dir/pbr.user.isp"
 
         if [ -f "$pbr_makefile" ]; then
-            if ! grep -q "pbr.user.cmcc" "$pbr_makefile"; then
+            if ! grep -q "pbr.user.isp" "$pbr_makefile"; then
                 echo "正在修改 PBR Makefile 添加安装规则..."
                 sed -i '/pbr.user.netflix.*\$(1)/a\
-	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.cmcc $(1)/usr/share/pbr/pbr.user.cmcc\
-	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.cmcc6 $(1)/usr/share/pbr/pbr.user.cmcc6' "$pbr_makefile"
+	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.isp $(1)/usr/share/pbr/pbr.user.isp' "$pbr_makefile"
             fi
+        fi
+        
+        # Add auto-retry mechanism to pbr init script
+        if [ -f "$pbr_init_script" ]; then
+            echo "正在添加 PBR 自动重试机制..."
+            # Simple retry: try every 10s for up to 50s if not configured
+            cat >> "$pbr_init_script" << 'EOF'
+
+# PBR auto-retry (simple version)
+[ -f /var/run/pbr_configured ] || ( for i in 1 2 3 4 5; do
+    sleep 10
+    /usr/share/pbr/pbr.user.isp >/dev/null 2>&1 && break
+done ) &
+EOF
         fi
     fi
 
     if [ -f "$pbr_conf" ]; then
-        if ! grep -q "pbr.user.cmcc" "$pbr_conf"; then
-            echo "正在添加 PBR CMCC 配置条目..."
+        if ! grep -q "pbr.user.isp" "$pbr_conf"; then
+            echo "正在添加 PBR ISP 自动识别配置条目..."
             sed -i "/option path '\/usr\/share\/pbr\/pbr.user.netflix'/,/option enabled '0'/{
                 /option enabled '0'/a\\
 \\
 config include\\
-	option path '/usr/share/pbr/pbr.user.cmcc'\\
-	option enabled '0'\\
-\\
-config include\\
-	option path '/usr/share/pbr/pbr.user.cmcc6'\\
-	option enabled '0'
+	option path '/usr/share/pbr/pbr.user.isp'\\
+	option enabled '1'
             }" "$pbr_conf"
-        fi
-    fi
-}
-
-install_pbr_unicom() {
-    local pbr_pkg_dir="$BUILD_DIR/package/feeds/packages/pbr"
-    local pbr_dir="$pbr_pkg_dir/files/usr/share/pbr"
-    local pbr_conf="$pbr_pkg_dir/files/etc/config/pbr"
-    local pbr_makefile="$pbr_pkg_dir/Makefile"
-
-    if [ -d "$pbr_pkg_dir" ]; then
-        echo "正在安装 PBR Unicom 配置文件..."
-        install -Dm644 "$BASE_PATH/patches/pbr.user.unicom" "$pbr_dir/pbr.user.unicom"
-        install -Dm644 "$BASE_PATH/patches/pbr.user.unicom6" "$pbr_dir/pbr.user.unicom6"
-
-        if [ -f "$pbr_makefile" ]; then
-            if ! grep -q "pbr.user.unicom" "$pbr_makefile"; then
-                echo "正在修改 PBR Makefile 添加安装规则..."
-                sed -i '/pbr.user.cmcc6.*\$(1)/a\
-	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.unicom $(1)/usr/share/pbr/pbr.user.unicom\
-	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.unicom6 $(1)/usr/share/pbr/pbr.user.unicom6' "$pbr_makefile"
-            fi
-        fi
-    fi
-
-    if [ -f "$pbr_conf" ]; then
-        if ! grep -q "pbr.user.unicom" "$pbr_conf"; then
-            echo "正在添加 PBR Unicom 配置条目..."
-            sed -i "/pbr.user.cmcc6/a\\
-\\
-config include\\
-	option path '/usr/share/pbr/pbr.user.unicom'\\
-	option enabled '0'\\
-\\
-config include\\
-	option path '/usr/share/pbr/pbr.user.unicom6'\\
-	option enabled '0'" "$pbr_conf"
-        fi
-    fi
-}
-
-install_pbr_telecom() {
-    local pbr_pkg_dir="$BUILD_DIR/package/feeds/packages/pbr"
-    local pbr_dir="$pbr_pkg_dir/files/usr/share/pbr"
-    local pbr_conf="$pbr_pkg_dir/files/etc/config/pbr"
-    local pbr_makefile="$pbr_pkg_dir/Makefile"
-
-    if [ -d "$pbr_pkg_dir" ]; then
-        echo "正在安装 PBR Telecom 配置文件..."
-        install -Dm644 "$BASE_PATH/patches/pbr.user.telecom" "$pbr_dir/pbr.user.telecom"
-        install -Dm644 "$BASE_PATH/patches/pbr.user.telecom6" "$pbr_dir/pbr.user.telecom6"
-
-        if [ -f "$pbr_makefile" ]; then
-            if ! grep -q "pbr.user.telecom" "$pbr_makefile"; then
-                echo "正在修改 PBR Makefile 添加安装规则..."
-                sed -i '/pbr.user.unicom6.*\$(1)/a\
-	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.telecom $(1)/usr/share/pbr/pbr.user.telecom\
-	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.telecom6 $(1)/usr/share/pbr/pbr.user.telecom6' "$pbr_makefile"
-            fi
-        fi
-    fi
-
-    if [ -f "$pbr_conf" ]; then
-        if ! grep -q "pbr.user.telecom" "$pbr_conf"; then
-            echo "正在添加 PBR Telecom 配置条目..."
-            sed -i "/pbr.user.unicom6/a\\
-\\
-config include\\
-	option path '/usr/share/pbr/pbr.user.telecom'\\
-	option enabled '0'\\
-\\
-config include\\
-	option path '/usr/share/pbr/pbr.user.telecom6'\\
-	option enabled '0'" "$pbr_conf"
         fi
     fi
 }
@@ -688,6 +436,18 @@ remove_tweaked_packages() {
     if [ -f "$target_mk" ]; then
         if grep -q "^DEFAULT_PACKAGES += \$(DEFAULT_PACKAGES.tweak)" "$target_mk"; then
             sed -i 's/DEFAULT_PACKAGES += $(DEFAULT_PACKAGES.tweak)/# DEFAULT_PACKAGES += $(DEFAULT_PACKAGES.tweak)/g' "$target_mk"
+        fi
+    fi
+}
+
+fix_quickstart() {
+    local file_path="$BUILD_DIR/feeds/openwrt_packages/luci-app-quickstart/luasrc/controller/istore_backend.lua"
+    local url="https://gist.githubusercontent.com/puteulanus/1c180fae6bccd25e57eb6d30b7aa28aa/raw/istore_backend.lua"
+    if [ -f "$file_path" ]; then
+        echo "正在修复 quickstart..."
+        if ! curl -fsSL -o "$file_path" "$url"; then
+            echo "错误：从 $url 下载 istore_backend.lua 失败" >&2
+            exit 1
         fi
     fi
 }

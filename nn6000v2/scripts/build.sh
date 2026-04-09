@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -e
 
 # Determine nn6000v2 path
@@ -55,8 +56,6 @@ apply_config() {
     fi
 
     cat "$BASE_PATH/configs/kernel/docker_deps.config" >> "$BASE_PATH/../$BUILD_DIR/.config"
-
-    cat "$BASE_PATH/configs/kernel/proxy.config" >> "$BASE_PATH/../$BUILD_DIR/.config"
 }
 
 REPO_URL=$(read_ini_by_key "REPO_URL")
@@ -90,13 +89,6 @@ modify_kernel_size
 
 cd "$BASE_PATH/../$BUILD_DIR"
 make defconfig
-
-if grep -qE "^CONFIG_TARGET_x86_64=y" "$CONFIG_FILE"; then
-    DISTFEEDS_PATH="$BASE_PATH/../$BUILD_DIR/package/emortal/default-settings/files/99-distfeeds.conf"
-    if [ -d "${DISTFEEDS_PATH%/*}" ] && [ -f "$DISTFEEDS_PATH" ]; then
-        sed -i 's/aarch64_cortex-a53/x86_64/g' "$DISTFEEDS_PATH"
-    fi
-fi
 
 if [[ $Build_Mod == "debug" ]]; then
     exit 0

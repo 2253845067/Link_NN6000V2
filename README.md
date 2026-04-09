@@ -47,13 +47,13 @@
 | **luci-app-samba4**      | SMB 文件共享      |
 | **luci-app-pbr**         | 策略路由          |
 | **luci-app-wol**         | 网络唤醒          |
-| **luci-app-passwall**    | 科学上网          |
+| **luci-app-passwall2**    | 科学上网          |
 
 ***
 
 ## 3. 插件来源
 
-三方插件源自：<https://github.com/kenzok8/jell>
+部分插件源自：<https://github.com/kenzok8/openwrt-packages>
 
 ***
 
@@ -69,20 +69,6 @@ Link_NN6000V2/
         ├── build.sh       # 编译脚本
         └── feeds.sh       # feeds配置脚本
 ```
-
-***
-
-## 5. OAF 应用过滤使用说明
-
-使用 OAF（应用过滤）功能前，需先完成以下操作：
-
-**步骤 1** → 打开 **系统设置** → **启动项** → 定位到「**appfilter**」
-
-**步骤 2** → 将「**appfilter**」从 **已禁用** 更改为 **已启用**
-
-**步骤 3** → 点击 **启动** 按钮激活服务
-
-⚠️ **注意**：未启用启动项将导致 OAF 功能无法正常工作
 
 ***
 
