@@ -73,6 +73,54 @@ configure_conntrack() {
 }
 
 #-------------------------------------------------------------------------------
+# 配置 ZeroTier 防火墙规则
+#-------------------------------------------------------------------------------
+configure_zerotier_firewall() {
+    # 检查防火墙配置文件
+    if [ ! -f "/etc/config/firewall" ]; then
+        log_error "防火墙配置文件不存在"
+        return 1
+    fi
+    
+    # 检查是否已配置 ZeroTier 规则
+    if uci show firewall | grep -q "zerotier"; then
+        log_info "ZeroTier 防火墙规则已存在，跳过"
+        return 0
+    fi
+    
+    log_info "正在配置 ZeroTier 防火墙规则..."
+    
+    # 添加 ZeroTier 区域
+    uci add firewall zone 2>/dev/null
+    uci set firewall.@zone[-1].name='zerotier' 2>/dev/null
+    uci set firewall.@zone[-1].input='ACCEPT' 2>/dev/null
+    uci set firewall.@zone[-1].output='ACCEPT' 2>/dev/null
+    uci set firewall.@zone[-1].forward='ACCEPT' 2>/dev/null
+    uci set firewall.@zone[-1].masq='no' 2>/dev/null
+    uci set firewall.@zone[-1].mtu_fix='0' 2>/dev/null
+    uci set firewall.@zone[-1].network='zerotier' 2>/dev/null
+    
+    # 允许 ZeroTier 到 LAN 的转发
+    uci add firewall forwarding 2>/dev/null
+    uci set firewall.@forwarding[-1].src='zerotier' 2>/dev/null
+    uci set firewall.@forwarding[-1].dest='lan' 2>/dev/null
+    
+    # 允许 LAN 到 ZeroTier 的转发
+    uci add firewall forwarding 2>/dev/null
+    uci set firewall.@forwarding[-1].src='lan' 2>/dev/null
+    uci set firewall.@forwarding[-1].dest='zerotier' 2>/dev/null
+    
+    # 提交配置
+    uci commit firewall 2>/dev/null || {
+        log_error "提交 ZeroTier 防火墙配置失败"
+        return 1
+    }
+    
+    log_info "ZeroTier 防火墙规则配置完成"
+    return 0
+}
+
+#-------------------------------------------------------------------------------
 # 解除 dropbear SSH 访问限制
 #-------------------------------------------------------------------------------
 configure_dropbear() {
@@ -115,6 +163,72 @@ configure_dropbear() {
 }
 
 #-------------------------------------------------------------------------------
+# 网络优化配置
+#-------------------------------------------------------------------------------
+configure_network_optimization() {
+    local sysctl_conf="/etc/sysctl.conf"
+    
+    log_info "正在应用网络优化配置..."
+    
+    # 清理旧的网络优化配置
+    if [ -f "$sysctl_conf" ]; then
+        sed -i '/^net\.netfilter\.nf_conntrack_tcp_timeout/d' "$sysctl_conf"
+        sed -i '/^net\.ipv4\.tcp_/d' "$sysctl_conf"
+        sed -i '/^net\.core\./d' "$sysctl_conf"
+    fi
+    
+    # TCP 超时优化
+    cat >> "$sysctl_conf" << 'EOF'
+
+#========== 网络优化配置 ==========#
+# TCP 连接超时优化
+net.netfilter.nf_conntrack_tcp_timeout_established = 432000
+net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 120
+net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 120
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 120
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 30
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 60
+
+# TCP 性能优化
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_keepalive_probes = 5
+net.ipv4.tcp_keepalive_intvl = 15
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_max_tw_buckets = 8192
+net.ipv4.tcp_window_scaling = 1
+
+# TCP 缓冲区优化
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.core.rmem_default = 262144
+net.core.wmem_default = 262144
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+
+# 网络队列和端口优化
+net.core.netdev_max_backlog = 5000
+net.core.somaxconn = 4096
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_max_syn_backlog = 8192
+
+# NAT 优化
+net.netfilter.nf_conntrack_expect_max = 8192
+EOF
+    
+    # 应用配置
+    if sysctl -p >/dev/null 2>&1; then
+        log_info "网络优化配置已应用"
+        return 0
+    else
+        log_error "应用网络优化配置失败"
+        return 1
+    fi
+}
+
+#-------------------------------------------------------------------------------
 # 主函数
 #-------------------------------------------------------------------------------
 main() {
@@ -125,6 +239,12 @@ main() {
     
     # 配置 dropbear
     configure_dropbear
+    
+    # 配置 ZeroTier 防火墙规则
+    configure_zerotier_firewall
+    
+    # 网络优化
+    configure_network_optimization
 
     log_info "自定义配置应用完成"
 }

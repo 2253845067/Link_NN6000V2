@@ -46,15 +46,14 @@ main() {
     install_diskman
     install_dockerman
     install_adguardhome
-    install_passwall2
     install_easytier
     install_oaf
+    install_passwall
     install_feeds
     update_docker_stack
     remove_tweaked_packages
-    fix_default_set
-    fix_miniupnpd
     change_dnsmasq2full
+    fix_default_set
     fix_mk_def_depends
     update_default_lan_addr
     update_affinity_script

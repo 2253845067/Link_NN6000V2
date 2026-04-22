@@ -2,6 +2,10 @@ name: Go_Release
 
 on:
   workflow_dispatch:
+  schedule:
+    # 每 3 天编译一次（UTC 时间，北京时间 = UTC+8）
+    # UTC 20:00 = 北京时间 04:00
+    - cron: '0 20 */3 * *'
 
 env:
   DEVICE_MODEL: link_nn6000v2_immwrt
@@ -97,12 +101,73 @@ jobs:
           echo "云编译发布" > release_body.txt
           echo "源码：${{ env.BUILD_SRC }}" >> release_body.txt
           echo "Kernel: ${{ env.KVER }}" >> release_body.txt
-          echo "WIFI密码: 147258369" >> release_body.txt
-          echo "LAN地址: 10.0.0.1" >> release_body.txt
+          echo "WIFI 密码：147258369" >> release_body.txt
+          echo "LAN 地址：10.0.0.1" >> release_body.txt
+
+      - name: Clean Old Releases, Tags and Workflow Runs
+        run: |
+          # 获取当前发布的 tag
+          CURRENT_TAG="${{ env.BUILD_DATE }}_${{ env.DEVICE_MODEL }}"
+          echo "当前编译版本：$CURRENT_TAG"
+          
+          # ========== 清理 Releases 和 Tags ==========
+          echo "开始清理旧的 releases..."
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | while read -r old_tag; do
+            if [ -n "$old_tag" ] && [ "$old_tag" != "$CURRENT_TAG" ]; then
+              echo "删除旧版本：$old_tag"
+              gh release delete "$old_tag" --cleanup-tag --yes || true
+            fi
+          done
+          
+          echo "清理孤立的 tags..."
+          git fetch --tags
+          git tag -l | grep -v "$CURRENT_TAG" | while read -r tag; do
+            echo "删除孤立 tag: $tag"
+            git tag -d "$tag" || true
+          done
+          
+          echo "Releases 和 Tags 清理完成！"
+          
+          # ========== 清理 Workflow 运行记录 ==========
+          echo "开始清理旧的 workflow 运行记录..."
+          
+          # 获取当前工作流 ID
+          WORKFLOW_ID=$(gh api /repos/${{ github.repository }}/actions/workflows | jq -r '.workflows[] | select(.name=="Go_Release") | .id')
+          echo "Workflow ID: $WORKFLOW_ID"
+          
+          if [ -z "$WORKFLOW_ID" ]; then
+            echo "错误：无法获取 Workflow ID"
+            exit 1
+          fi
+          
+          # 获取所有运行记录
+          CURRENT_RUN_ID=${{ github.run_id }}
+          echo "当前运行 ID: $CURRENT_RUN_ID"
+          
+          # 获取所有运行记录并删除旧的
+          gh api /repos/${{ github.repository }}/actions/workflows/$WORKFLOW_ID/runs --paginate --jq '.workflow_runs[] | select(.id != '"$CURRENT_RUN_ID"') | .id' | head -n -1 | while read -r run_id; do
+            if [ -n "$run_id" ]; then
+              echo "删除 workflow 运行记录：$run_id"
+              gh api -X DELETE /repos/${{ github.repository }}/actions/runs/$run_id || echo "删除失败：$run_id"
+            fi
+          done
+          
+          # 验证删除结果
+          REMAINING_RUNS=$(gh api /repos/${{ github.repository }}/actions/workflows/$WORKFLOW_ID/runs --paginate --jq '.workflow_runs | length')
+          echo "剩余运行记录数：$REMAINING_RUNS"
+          
+          echo "所有清理工作完成！"
 
       - name: Release Firmware
-        uses: softprops/action-gh-release@v2.6.1
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ env.BUILD_DATE }}_${{ inputs.model }}
-          files: ${{ inputs.model == 'n1_immwrt' && env.PACKAGED_OUTPUTPATH || './firmware' }}/*.*
+          tag_name: ${{ env.BUILD_DATE }}_${{ env.DEVICE_MODEL }}
+          files: |
+            ./firmware/*.bin
+            ./firmware/*.manifest
+            ./firmware/*.img.gz
+            ./firmware/*.itb
+            ./firmware/*.fip
+            ./firmware/*.ubi
           body_path: ./release_body.txt
+          make_latest: true

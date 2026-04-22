@@ -12,36 +12,57 @@ update_golang() {
 }
 
 install_openwrt_packages() {
-    ./scripts/feeds install -p openwrt_packages -f taskd luci-lib-xterm luci-lib-taskd \
+    ./scripts/feeds install -p openwrt_packages -f \
+        xray-core sing-box trojan-plus naiveproxy shadowsocks-libev v2ray-plugin geoview \
+        microsocks tcping chinadns-ng dns2socks resolveip \
+        taskd luci-lib-xterm luci-lib-taskd \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex \
         smartdns luci-app-smartdns luci-theme-argon luci-app-argon-config \
         luci-lib-docker luci-app-lucky luci-app-adguardhome luci-app-easytier \
-        luci-app-oaf open-app-filter oaf \
-        luci-app-diskman luci-app-dockerman luci-app-quickfile luci-app-passwall2
+        luci-app-oaf oaf open-app-filter \
+        luci-app-diskman luci-app-dockerman luci-app-quickfile luci-app-passwall
 }
 
-
-install_passwall_packages() {
-    ./scripts/feeds install -p passwall_packages -f chinadns-ng geoview hysteria sing-box tcping v2ray-geodata xray-core
-    echo "✓ Passwall 依赖安装完成"
-}
-
-install_passwall2() {
-    local PASSWALL2_REPO="https://github.com/Openwrt-Passwall/openwrt-passwall2.git"
-    local PASSWALL2_DIR="$BUILD_DIR/feeds/openwrt_packages/openwrt-passwall2"
-
-    rm -rf "$PASSWALL2_DIR"
-    if ! git clone --depth=1 -b main "$PASSWALL2_REPO" "$PASSWALL2_DIR"; then
-        echo "错误：从 $PASSWALL2_REPO 克隆 luci-app-passwall2 仓库失败" >&2
+install_passwall() {
+    local PASSWALL_LUCI_DIR="$BUILD_DIR/feeds/openwrt_packages/luci-app-passwall"
+    local PASSWALL_PACKAGES_DIR="$BUILD_DIR/feeds/openwrt_packages/passwall-packages"
+    local TEMP_DIR="$BUILD_DIR/feeds/openwrt_packages/openwrt-passwall-temp"
+    
+    # 克隆 openwrt-passwall 仓库
+    rm -rf "$TEMP_DIR"
+    if ! git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall.git "$TEMP_DIR"; then
+        echo "错误：克隆 openwrt-passwall 仓库失败" >&2
         exit 1
     fi
-
-    echo "✓ luci-app-passwall2 克隆完成"
+    
+    rm -rf "$PASSWALL_LUCI_DIR"
+    mv "$TEMP_DIR/luci-app-passwall" "$PASSWALL_LUCI_DIR"
+    rm -rf "$TEMP_DIR"
+    echo "✓ luci-app-passwall 克隆完成"
+    
+    rm -rf "$PASSWALL_PACKAGES_DIR"
+    local PASSWALL_PKGS_TEMP="$BUILD_DIR/feeds/openwrt_packages/passwall-packages-temp"
+    rm -rf "$PASSWALL_PKGS_TEMP"
+    if ! git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git "$PASSWALL_PKGS_TEMP"; then
+        echo "错误：克隆 openwrt-passwall-packages 仓库失败" >&2
+        exit 1
+    fi
+    
+    for pkg in "$PASSWALL_PKGS_TEMP"/*; do
+        if [ -d "$pkg" ]; then
+            local pkg_name=$(basename "$pkg")
+            mv "$pkg" "$BUILD_DIR/feeds/openwrt_packages/$pkg_name"
+        fi
+    done
+    rm -rf "$PASSWALL_PKGS_TEMP"
+    echo "✓ passwall-packages 克隆并移动完成"
+    
+    echo "✓ Passwall 安装完成"
 }
 
 install_fullconenat() {
-    # 安装 fullconenat 相关包
-    ./scripts/feeds install -p packages -f kmod-fullconenat
+    # 安装 fullconenat
+    ./scripts/feeds install -p packages -f kmod-nft-fullcone
 }
 
 install_lucky() {
@@ -153,25 +174,37 @@ install_oaf() {
     local OAF_REPO="https://github.com/destan19/OpenAppFilter.git"
     local OAF_DIR="$BUILD_DIR/feeds/openwrt_packages/OpenAppFilter"
 
+    ./scripts/feeds install -f kmod-ipt-conntrack kmod-ipt-nat
+    
     rm -rf "$OAF_DIR"
     if ! git clone --depth=1 "$OAF_REPO" "$OAF_DIR"; then
         echo "错误：从 $OAF_REPO 克隆 OpenAppFilter 仓库失败" >&2
         exit 1
     fi
 
-    # 修复 oaf 递归依赖问题，但保留必要依赖
     local oaf_makefile="$OAF_DIR/oaf/Makefile"
     if [ -f "$oaf_makefile" ]; then
         sed -i 's/DEPENDS:=.*oaf/DEPENDS:=+kmod-ipt-conntrack +kmod-ipt-nat/g' "$oaf_makefile"
     fi
 
-    # 默认禁用 OAF 服务
-    local oaf_config="$OAF_DIR/open-app-filter/files/etc/config/appfilter"
-    if [ -f "$oaf_config" ]; then
-        sed -i "s/option enabled '1'/option enabled '0'/g" "$oaf_config"
+
+    local appfilter_config="$OAF_DIR/open-app-filter/files/etc/config/appfilter"
+    if [ -f "$appfilter_config" ]; then
+        sed -i "s/option enabled '1'/option enabled '0'/g" "$appfilter_config"
     fi
 
-    echo "✓ OpenAppFilter 克隆完成"
+    local disable_script="$OAF_DIR/luci-app-oaf/root/etc/uci-defaults/99_disable_oaf"
+    mkdir -p "$(dirname "$disable_script")"
+    cat > "$disable_script" << 'EOF'
+#!/bin/sh
+[ "$(uci get appfilter.global.enable 2>/dev/null)" = "0" ] && {
+    /etc/init.d/appfilter disable
+    /etc/init.d/appfilter stop
+}
+EOF
+    chmod +x "$disable_script"
+
+    echo "✓ OpenAppFilter 克隆完成 (服务已禁用)"
 }
 
 install_diskman() {

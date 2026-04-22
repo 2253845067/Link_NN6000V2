@@ -47,7 +47,7 @@
 | **luci-app-samba4**      | SMB 文件共享      |
 | **luci-app-pbr**         | 策略路由          |
 | **luci-app-wol**         | 网络唤醒          |
-| **luci-app-passwall2**    | 科学上网          |
+| **luci-app-passwall**    | 科学上网          |
 
 ***
 
