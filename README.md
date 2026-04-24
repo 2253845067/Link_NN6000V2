@@ -2,10 +2,10 @@
 
 ## 1. 项目信息
 
-- **原脚本仓库**：<https://github.com/ZqinKing/wrt_release.git>
+- **参考脚本**：<https://github.com/ZqinKing/wrt_release.git>
 - **源码来源**：<https://github.com/VIKINGYFY/immortalwrt.git> - main 自带满血NSS驱动
 - **设备支持**：Link\_NN6000V2,内核分区12m
-- **固件发布**：每三天发布一次，包含最新源码和插件。
+- **固件发布**：每三天发布一次，包含最新源码和插件。[点击下载](https://github.com/wzdddyy/Link_NN6000V2/releases/latest)
 
 ***
 
