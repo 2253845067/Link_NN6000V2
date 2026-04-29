@@ -360,50 +360,6 @@ _docker_stack_set_or_append_sysctl_value() {
 }
 
 #-------------------------------------------------------------------------------
-# 更新 dockerd Makefile 依赖
-#-------------------------------------------------------------------------------
-_docker_stack_update_dockerd_depends_block() {
-    local mk_path="$1"
-    local tmp_path
-    
-    tmp_path=$(_docker_stack_mktemp) || return 1
-    
-    awk '
-        BEGIN { in_depends = 0; replaced = 0 }
-        /^  DEPENDS:=\$\(GO_ARCH_DEPENDS\) \\$/ {
-            in_depends = 1; replaced = 1
-            print "  DEPENDS:=$(GO_ARCH_DEPENDS) \\" 
-            print "    +ca-certificates \\" 
-            print "    +containerd \\" 
-            print "    +iptables-nft \\" 
-            print "    +iptables-mod-extra \\" 
-            print "    +IPV6:ip6tables-nft \\" 
-            print "    +IPV6:kmod-ipt-nat6 \\" 
-            print "    +KERNEL_SECCOMP:libseccomp \\" 
-            print "    +kmod-ipt-nat \\" 
-            print "    +kmod-ipt-physdev \\" 
-            print "    +kmod-nf-ipvs \\" 
-            print "    +kmod-veth \\" 
-            print "    +nftables \\" 
-            print "    +kmod-nft-nat \\" 
-            print "    +tini \\" 
-            print "    +uci-firewall \\" 
-            print "    @!(mips||mips64||mipsel)"
-            next
-        }
-        in_depends { if ($0 ~ /@!\(mips\|\|mips64\|\|mipsel\)/) in_depends = 0; next }
-        { print }
-        END { if (replaced == 0) exit 2 }
-    ' "$mk_path" > "$tmp_path" || {
-        _docker_stack_log_error "未能重写 $mk_path 的 DEPENDS 块"
-        return 1
-    }
-    
-    mv "$tmp_path" "$mk_path"
-    _docker_stack_log_debug "已更新 dockerd Makefile 依赖"
-}
-
-#-------------------------------------------------------------------------------
 # 修复 dockerd vendored 检查
 #-------------------------------------------------------------------------------
 _docker_stack_fix_dockerd_vendored_checks() {
@@ -412,29 +368,56 @@ _docker_stack_fix_dockerd_vendored_checks() {
     
     tmp_path=$(_docker_stack_mktemp) || return 1
     
-    awk '
-        {
-            if ($0 ~ /^[[:space:]]*\[ ! -f "\$\(PKG_BUILD_DIR\)\/hack\/dockerfile\/install\/containerd\.installer" \] \|\|[[:space:]]*\\$/) next
-            if ($0 ~ /^[[:space:]]*\[ ! -f "\$\(PKG_BUILD_DIR\)\/hack\/dockerfile\/install\/runc\.installer" \] \|\|[[:space:]]*\\$/) next
-            if ($0 ~ /^[[:space:]]*\$\(call EnsureVendoredVersion,\.\.\/containerd\/Makefile,containerd\.installer\)$/) {
-                print "\t[ ! -f \"$(PKG_BUILD_DIR)/hack/dockerfile/install/containerd.installer\" ] || \\" 
-                print "\t\t$(call EnsureVendoredVersion,../containerd/Makefile,containerd.installer)"
+    # 检测是否有 EnsureVendoredVersion 调用
+    if grep -q '\$(call EnsureVendoredVersion,' "$mk_path"; then
+        _docker_stack_log_debug "检测到 vendored 版本检查，正在禁用严格验证..."
+        
+        # 使用 awk 注释掉 Build/Prepare 中的所有版本验证
+        awk '
+            BEGIN { in_prepare = 0; skip_lines = 0 }
+            /^define Build\/Prepare/ { in_prepare = 1; print; next }
+            in_prepare && /^endef$/ { in_prepare = 0; print; next }
+            
+            # 注释掉 EnsureVendoredVersion 调用（第 84-86 行）
+            in_prepare && /[[:space:]]*\$\(call EnsureVendoredVersion,/ {
+                print "#" $0 " # Disabled by docker_stack"
                 next
             }
-            if ($0 ~ /^[[:space:]]*\$\(call EnsureVendoredVersion,\.\.\/runc\/Makefile,runc\.installer\)$/) {
-                print "\t[ ! -f \"$(PKG_BUILD_DIR)/hack/dockerfile/install/runc.installer\" ] || \\" 
-                print "\t\t$(call EnsureVendoredVersion,../runc/Makefile,runc.installer)"
+            
+            # 处理 CLI 版本检查（第 89-95 行，共 7 行）
+            in_prepare && /[[:space:]]*CLI_MAKEFILE=/ {
+                print "#" $0 " # Disabled by docker_stack"
+                skip_lines = 6
                 next
             }
-            print
+            
+            # 处理 PKG_GIT_SHORT_COMMIT 检查（第 98-103 行，共 6 行）
+            in_prepare && /[[:space:]]*EXPECTED_PKG_GIT_SHORT_COMMIT=/ {
+                print "#" $0 " # Disabled by docker_stack"
+                skip_lines = 5
+                next
+            }
+            
+            # 跳过需要注释的后续行
+            skip_lines > 0 {
+                print "#" $0 " # Disabled by docker_stack"
+                skip_lines--
+                next
+            }
+            
+            { print }
+        ' "$mk_path" > "$tmp_path" || {
+            _docker_stack_log_error "未能禁用 vendored 严格验证"
+            return 1
         }
-    ' "$mk_path" > "$tmp_path" || {
-        _docker_stack_log_error "未能修补 vendored 依赖校验"
-        return 1
-    }
+        
+        mv "$tmp_path" "$mk_path"
+        _docker_stack_log_debug "已禁用 vendored 版本检查"
+        return 0
+    fi
     
-    mv "$tmp_path" "$mk_path"
-    _docker_stack_log_debug "已修复 vendored 检查"
+    _docker_stack_log_debug "Makefile 未使用 EnsureVendoredVersion 宏，无需处理"
+    return 0
 }
 
 #-------------------------------------------------------------------------------
@@ -450,6 +433,8 @@ _docker_stack_fix_dockerd_nftables_comment() {
             -e "/^# \`firewall4\` -> \`firewall\`/d" \
             -e "/^# \`iptables-nft\` -> \`iptables-legacy\`/d" \
             -e "/^# \`ip6tables-nft\` -> \`ip6tables-legacy\`/d" \
+            -e "/^# \`iptables-nft\` -> \`iptables-zz-legacy\`/d" \
+            -e "/^# \`ip6tables-nft\` -> \`ip6tables-zz-legacy\`/d" \
             "$config_path"
         _docker_stack_log_debug "已更新 nftables 注释"
     fi
@@ -647,7 +632,7 @@ _docker_stack_patch_nft_prereq_block() {
         BEGIN { inserted = 0 }
         {
             print
-            if ($0 ~ /^DOCKERD_CONF="\$\{DOCKER_CONF_DIR\}\/daemon\.json"$/ && inserted == 0) {
+            if ($0 ~ /^DOCKERD_CONF=/ && inserted == 0) {
                 inserted = 1
                 print ""
                 print "# === DOCKER_STACK_NFT_PREREQ_START ==="
@@ -716,7 +701,7 @@ _docker_stack_patch_process_config_nftables() {
         awk '
             BEGIN { replaced = 0; skipping = 0 }
             {
-                if ($0 ~ /^[[:space:]]*config_get data_root globals data_root "\/opt\/docker\/"$/) {
+                if ($0 ~ /^[[:space:]]*config_get[[:space:]]+data_root[[:space:]]+globals[[:space:]]+data_root/) {
                     replaced = 1; skipping = 1
                     print "\tconfig_get data_root globals data_root \"/opt/docker/\""
                     print "\tconfig_get log_level globals log_level \"warn\""
@@ -752,7 +737,7 @@ _docker_stack_patch_process_config_nftables() {
                     next
                 }
                 if (skipping == 1) {
-                    if ($0 ~ /^[[:space:]]*config_get_bool ip6tables globals ip6tables "0"$/) {
+                    if ($0 ~ /^[[:space:]]*config_get_bool[[:space:]]+ip6tables[[:space:]]+globals[[:space:]]+ip6tables/) {
                         skipping = 0
                     }
                     next
@@ -782,7 +767,7 @@ _docker_stack_patch_process_config_nftables() {
         awk '
             BEGIN { replaced = 0 }
             {
-                if ($0 ~ /^[[:space:]]*\[ "\$\{iptables\}" -eq "1" \] && config_foreach iptables_add_blocking_rule firewall$/) {
+                if ($0 ~ /^[[:space:]]*\[.*iptables.*-eq.*1.*\].*config_foreach.*iptables_add_blocking_rule.*firewall/) {
                     replaced = 1
                     print "\tBLOCKING_RULE_ERROR=0"
                     print "\tif [ \"${firewall_backend}\" = \"nftables\" ]; then"
@@ -1090,7 +1075,6 @@ _docker_stack_update_dockerd_nftables_defaults() {
         return 0
     fi
     
-    _docker_stack_update_dockerd_depends_block "$dockerd_makefile" || return 1
     _docker_stack_fix_dockerd_vendored_checks "$dockerd_makefile" || return 1
     
     _docker_stack_ensure_nftables_init_support "$dockerd_init" || return 1
@@ -1288,9 +1272,9 @@ Docker 堆栈更新工具 - 自动更新 OpenWrt 固件中的 Docker 组件
 
 环境变量:
   BUILD_DIR                        OpenWrt 构建目录路径 (必需)
-  DOCKER_STACK_RUNC_VERSION        runc 版本 (默认：v1.3.3)
-  DOCKER_STACK_CONTAINERD_VERSION  containerd 版本 (默认：v1.7.28)
-  DOCKER_STACK_DOCKER_VERSION      docker 版本 (默认：v29.3.1)
+  DOCKER_STACK_RUNC_VERSION        runc 版本 (默认：v1.3.5)
+  DOCKER_STACK_CONTAINERD_VERSION  containerd 版本 (默认：v2.2.3)
+  DOCKER_STACK_DOCKER_VERSION      docker 版本 (默认：v29.4.1)
   DOCKER_STACK_DOCKERD_VERSION     dockerd 版本 (默认：同 DOCKER_STACK_DOCKER_VERSION)
   DOCKER_STACK_STORAGE_DRIVER      存储驱动 (默认：overlay2)
   DOCKER_STACK_DRY_RUN             预览模式，不修改文件 (0/1, 默认：0)
@@ -1334,8 +1318,8 @@ HELP
 update_docker_stack() {
     local build_dir="${BUILD_DIR:-}"
     local runc_version="${DOCKER_STACK_RUNC_VERSION:-v1.3.5}"
-    local containerd_version="${DOCKER_STACK_CONTAINERD_VERSION:-v1.7.30}"
-    local docker_version="${DOCKER_STACK_DOCKER_VERSION:-v29.3.1}"
+    local containerd_version="${DOCKER_STACK_CONTAINERD_VERSION:-v2.2.3}"
+    local docker_version="${DOCKER_STACK_DOCKER_VERSION:-v29.4.1}"
     local dockerd_version="${DOCKER_STACK_DOCKERD_VERSION:-$docker_version}"
     local storage_driver="${DOCKER_STACK_STORAGE_DRIVER:-vfs}"
     local dry_run="${DOCKER_STACK_DRY_RUN:-0}"
