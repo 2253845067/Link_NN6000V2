@@ -2,6 +2,15 @@ name: Go_Release
 
 on:
   workflow_dispatch:
+    inputs:
+      pppoe_username:
+        description: 'PPPoE 宽带账号 (留空使用默认值 "-")'
+        required: false
+        default: '-'
+      pppoe_password:
+        description: 'PPPoE 宽带密码 (留空使用默认值 "-")'
+        required: false
+        default: '-'
   schedule:
     # 每 3 天编译一次（UTC 时间，北京时间 = UTC+8）
     # UTC 20:00 = 北京时间 04:00
@@ -119,6 +128,21 @@ jobs:
 
       - name: Build Firmware
         run: |
+          # 设置 PPPoE 配置
+          PPPOE_USER="${{ github.event.inputs.pppoe_username || '-' }}"
+          PPPOE_PASS="${{ github.event.inputs.pppoe_password || '-' }}"
+          
+          if [ "$PPPOE_USER" != "-" ] || [ "$PPPOE_PASS" != "-" ]; then
+            echo "正在配置 PPPoE 账号密码..."
+            # 替换脚本中的 PPPoE 配置
+            sed -i "s/^PPPOE_USERNAME=.*/PPPOE_USERNAME=\"$PPPOE_USER\"/" ./nn6000v2/patches/992_network_config.sh
+            sed -i "s/^PPPOE_PASSWORD=.*/PPPOE_PASSWORD=\"$PPPOE_PASS\"/" ./nn6000v2/patches/992_network_config.sh
+            echo "PPPoE Username: $PPPOE_USER"
+            echo "PPPoE Password: [HIDDEN]"
+          else
+            echo "未输入 PPPoE 账号密码，使用默认值 '-'"
+          fi
+          
           ./nn6000v2/scripts/build.sh ${{ env.DEVICE_MODEL }}
           
           # 获取内核版本
@@ -142,14 +166,35 @@ jobs:
       - name: Cleanup Old Cache
         continue-on-error: true
         run: |
-          # 获取缓存列表并删除
-          gh cache list --key ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }} --json key --jq '.[] | .key' | while read -r key; do
-            gh cache delete "$key"
-          done
-          # 输出缓存状态
+          echo "=== Cleaning up old caches ==="
+          
+          # List all caches first
+          echo "Current caches:"
+          gh cache list || true
+          
+          # Delete all caches with the current matrix.os prefix
+          CACHE_PREFIX="${{ matrix.os }}-"
+          echo "Searching caches with prefix: ${CACHE_PREFIX}*"
+          
+          # Get matching cache keys
+          MATCHING_CACHES=$(gh cache list --json key --jq '.[].key' 2>/dev/null | grep "^${CACHE_PREFIX}" || true)
+          
+          if [ -n "$MATCHING_CACHES" ]; then
+            echo "Found caches to delete:"
+            echo "$MATCHING_CACHES" | while IFS= read -r key; do
+              if [ -n "$key" ]; then
+                echo "  → Deleting: $key"
+                gh cache delete "$key" || true
+              fi
+            done
+            echo "Cache cleanup completed"
+          else
+            echo "No matching caches found, skipping cleanup"
+          fi
+          
           echo "========cache status========"
-          echo "ccache: $(du -sh ./action_build/.ccache | cut -f 1)"
-          echo "staging: $(du -sh ./action_build/staging_dir | cut -f 1)"
+          echo "ccache: $(du -sh ./action_build/.ccache 2>/dev/null | cut -f 1 || echo 'N/A')"
+          echo "staging: $(du -sh ./action_build/staging_dir 2>/dev/null | cut -f 1 || echo 'N/A')"
 
       - name: Machine Information
         run: |

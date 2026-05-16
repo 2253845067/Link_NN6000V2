@@ -19,6 +19,7 @@ WIFI_2G_TXPOWER=22
 
 # ==================== PPPoE 宽带配置 ====================
 # 填写你的宽带账号密码，使用 "-" 表示跳过配置
+# 在 GitHub Actions 构建时可以通过输入参数自动替换此处的值
 PPPOE_USERNAME="-"
 PPPOE_PASSWORD="-"
 
