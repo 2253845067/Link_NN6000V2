@@ -295,6 +295,6 @@ remove_attendedsysupgrade() {
 
 clone_luci_zerotier() {
     clone_packages "luci-app-zerotier" \
-        "${GITHUB_BASE}zhengmz/luci-app-zerotier.git" \
+        "${GITHUB_BASE}wzdddyy/luci-app-zerotier.git" \
         "$OPENWRT_PACKAGES_DIR/luci-app-zerotier"
 }
