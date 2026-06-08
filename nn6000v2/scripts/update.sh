@@ -51,6 +51,7 @@ main() {
     clone_luci_tailscale
     clone_passwall
     install_feeds
+    fix_smartdns_makefile
     update_docker_stack
     remove_tweaked_packages
     change_dnsmasq2full
