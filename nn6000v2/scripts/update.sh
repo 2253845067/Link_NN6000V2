@@ -68,6 +68,7 @@ main() {
     set_build_signature
     add_backup_info_to_sysupgrade
     remove_attendedsysupgrade
+    fix_rust_compile_error
     fix_kconfig_recursive_dependency
     set_nginx_default_config
     update_nginx_ubus_module
