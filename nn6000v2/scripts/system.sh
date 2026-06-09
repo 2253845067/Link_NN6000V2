@@ -218,12 +218,18 @@ fix_smartdns_makefile() {
     # 删除 Build/Prepare 中的 smartdns-webui 下载
     sed -i '/^define Download\/smartdns-webui/,/^endef/d' "$makefile"
     sed -i '/smartdns-webui/d' "$makefile"
-    # 删除 Build/Prepare 和 Build/Compile 中的 ifneq 块（npm + cargo）
+    # 删除 Build/Prepare 和 Build/Compile 中的 ifneq 块
     sed -i '/ifneq.*CONFIG_PACKAGE_smartdns-ui/,/endif/d' "$makefile"
     # 删除 smartdns-ui 安装规则
     sed -i '/^define Package\/smartdns-ui\/install/,/^endef/d' "$makefile"
     # 删除 smartdns-ui 的 eval
     sed -i '/smartdns-ui)/d' "$makefile"
+    # 补充缺失的 zlib 依赖
+    if grep -q 'DEPENDS:=.*+i386:libatomic +libopenssl' "$makefile"; then
+        if ! grep -q '+zlib' "$makefile"; then
+            sed -i 's/DEPENDS:=+i386:libatomic +libopenssl/DEPENDS:=+i386:libatomic +libopenssl +zlib/' "$makefile"
+        fi
+    fi
     
     echo "smartdns Makefile 修复完成"
 }
