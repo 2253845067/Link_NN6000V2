@@ -7,13 +7,13 @@
 # ==================== WiFi 配置 ====================
 # 5G WiFi 设置
 WIFI_5G_SSID="NN6000_5G"
-WIFI_5G_KEY=""
+WIFI_5G_KEY="12345679"
 WIFI_5G_CHANNEL=36
 WIFI_5G_TXPOWER=24
 
 # 2.4G WiFi 设置
 WIFI_2G_SSID="NN6000"
-WIFI_2G_KEY=""
+WIFI_2G_KEY="12345679"
 WIFI_2G_CHANNEL=1
 WIFI_2G_TXPOWER=22
 
@@ -70,8 +70,8 @@ EOF
 }
 
 link_nn6000v2_wifi_cfg() {
-	configure_wifi 0 '5g' $WIFI_5G_CHANNEL 'HE80' $WIFI_5G_TXPOWER "$WIFI_5G_SSID" "$WIFI_5G_KEY" 'none'
-	configure_wifi 1 '2g' $WIFI_2G_CHANNEL 'HT20' $WIFI_2G_TXPOWER "$WIFI_2G_SSID" "$WIFI_2G_KEY" 'none'
+	configure_wifi 0 '5g' $WIFI_5G_CHANNEL 'HE80' $WIFI_5G_TXPOWER "$WIFI_5G_SSID" "$WIFI_5G_KEY"
+	configure_wifi 1 '2g' $WIFI_2G_CHANNEL 'HT20' $WIFI_2G_TXPOWER "$WIFI_2G_SSID" "$WIFI_2G_KEY"
 }
 
 setup_pppoe() {
