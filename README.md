@@ -43,7 +43,8 @@
 并预置 `kmod-sched-core` / `kmod-sched-bpf` / `kmod-xdp-sockets-diag`。
 
 已集成 [openwrt-daede](https://github.com/kenzok8/openwrt-daede) 的 `luci-app-daede` +
-`daed`（dae-wing，自带 Web 面板）后端，开箱即用。如需轻量 `dae` 内核或双后端切换，
+`daed`（dae-wing，自带 Web 面板）后端，开箱即用。编译时需 `CONFIG_NEED_BPF_TOOLCHAIN=y`
+（源码构建无预编译 LLVM），OpenWrt 会自行编译 eBPF 用的 LLVM 工具链，首次构建约多花 30-50 分钟。如需轻量 `dae` 内核或双后端切换，
 在配置中追加 `CONFIG_PACKAGE_dae=y` 即可。
 
 ***
