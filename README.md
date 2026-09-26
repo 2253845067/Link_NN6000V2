@@ -15,39 +15,40 @@
 
 | 配置项          | 默认值         | 说明                                       |
 | ------------ | ----------- | ---------------------------------------- |
-| **LAN IP**   | `10.0.0.1`  | (nn6000v2/scripts/update.sh) |
-| **WiFi 名称**  | `500/5`     | (nn6000v2/patches/992\_network\_config.sh) |
-| **WiFi 密码**  | `147258369` | 无线密码                                     |
-| **WiFi 状态**  | **禁用**      | 首次启动需手动开启                                |
+| **LAN IP**   | `192.168.2.1` | (nn6000v2/scripts/update.sh) |
+| **WiFi 名称**  | `NN6000`（2.4G）/ `NN6000_5G`（5G） | (nn6000v2/patches/992\_network\_config.sh) |
+| **WiFi 密码**  | 无（开放网络） | 不加密 |
+| **WiFi 状态**  | **默认开启** | 有 WiFi 固件首次启动自动开启 |
 | **PPPoE 账号** | **未配置**     | (nn6000v2/patches/992\_network\_config.sh)    |
 | **PPPoE 状态** | **自动拨号**    | 配置账号密码后自动拨号，无需手动开启                                 |
 
 ***
 
-### 2.2 预装插件（20 个）
+### 2.2 预装插件（6 个）
 
 | 插件名称                     | 功能说明          |
 | ------------------------ | ------------- |
 | **luci-app-argon**       | Argon 主题      |
-| **luci-app-istorex**     | 应用商店          |
-| **luci-app-dockerman**   | Docker        |
-| **luci-app-adguardhome** | 广告过滤          |
-| **luci-app-mini_diskmanager**     | 磁盘管理          |
-| **luci-app-smartdns**    | DNS 加速        |
 | **luci-app-autoreboot**  | 定时重启          |
-| **luci-app-sqm**         | QoS 智能队列      |
-| **luci-app-upnp**        | UPnP 端口映射     |
-| **luci-app-hd-idle**     | 硬盘休眠          |
-| **luci-app-p910nd**      | USB 打印机共享     |
-| **luci-app-easytier**    | EasyTier 虚拟组网 |
 | **luci-app-tailscale-community**    | Tailscale 虚拟组网 |
-| **luci-app-lucky**       | 多功能网络代理插件            |
-| **luci-app-oaf**         | 应用过滤-默认禁用        |
 | **luci-app-ttyd**        | 终端            |
-| **luci-app-quickfile**   | 文件管理          |
-| **luci-app-samba4**      | SMB 文件共享      |
-| **luci-app-pbr**         | 策略路由          |
-| **luci-app-homeproxy**    | 科学上网          |
+| **luci-app-homeproxy**   | 科学上网          |
+| **luci-app-wireguard**   | WireGuard VPN |
+
+***
+
+### 2.3 内核 eBPF / XDP 支持
+
+固件内核已启用 XDP socket、cgroup BPF、kprobes 与 BTF（`/sys/kernel/btf/vmlinux`），
+并预置 `kmod-sched-core` / `kmod-sched-bpf` / `kmod-xdp-sockets-diag`，
+可直接安装 `dae` / `daed` 等 eBPF 透明代理插件，无需重新编译固件。
+
+***
+
+### 2.4 已移除插件
+
+Docker、AdGuardHome、SmartDNS、SQM、UPnP、hd-idle、p910nd、EasyTier、Lucky、
+OAF、QuickFile、Samba4、PBR、磁盘管理、iStore 应用商店（含 quickstart）及其专用依赖均已移除。
 
 ***
 

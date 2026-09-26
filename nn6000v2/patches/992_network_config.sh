@@ -6,14 +6,14 @@
 
 # ==================== WiFi 配置 ====================
 # 5G WiFi 设置
-WIFI_5G_SSID="500/5"
-WIFI_5G_KEY="147258369"
+WIFI_5G_SSID="NN6000_5G"
+WIFI_5G_KEY=""
 WIFI_5G_CHANNEL=36
 WIFI_5G_TXPOWER=24
 
 # 2.4G WiFi 设置
-WIFI_2G_SSID="500/5"
-WIFI_2G_KEY="147258369"
+WIFI_2G_SSID="NN6000"
+WIFI_2G_KEY=""
 WIFI_2G_CHANNEL=1
 WIFI_2G_TXPOWER=22
 
@@ -39,6 +39,15 @@ configure_wifi() {
 	if [ -n "$now_encryption" ] && [ "$now_encryption" != "none" ]; then
 		return 0
 	fi
+
+	# 开放网络（encryption=none）不写 key，避免残留旧密码
+	local key_cmd=""
+	if [ "$encryption" = "none" ]; then
+		key_cmd="delete wireless.default_radio${radio}.key"
+	else
+		key_cmd="set wireless.default_radio${radio}.key=\"${key}\""
+	fi
+
 	uci -q batch <<EOF
 set wireless.radio${radio}.band="${band}"
 set wireless.radio${radio}.channel="${channel}"
@@ -47,10 +56,10 @@ set wireless.radio${radio}.mu_beamformer='1'
 set wireless.radio${radio}.country='US'
 set wireless.radio${radio}.txpower="${txpower}"
 set wireless.radio${radio}.cell_density='0'
-set wireless.radio${radio}.disabled='1'
+set wireless.radio${radio}.disabled='0'
 set wireless.default_radio${radio}.ssid="${ssid}"
 set wireless.default_radio${radio}.encryption="${encryption}"
-set wireless.default_radio${radio}.key="${key}"
+${key_cmd}
 set wireless.default_radio${radio}.ieee80211k='1'
 set wireless.default_radio${radio}.time_advertisement='2'
 set wireless.default_radio${radio}.time_zone='CST-8'
@@ -61,8 +70,8 @@ EOF
 }
 
 link_nn6000v2_wifi_cfg() {
-	configure_wifi 0 '5g' $WIFI_5G_CHANNEL 'HE80' $WIFI_5G_TXPOWER "$WIFI_5G_SSID" "$WIFI_5G_KEY"
-	configure_wifi 1 '2g' $WIFI_2G_CHANNEL 'HT20' $WIFI_2G_TXPOWER "$WIFI_2G_SSID" "$WIFI_2G_KEY"
+	configure_wifi 0 '5g' $WIFI_5G_CHANNEL 'HE80' $WIFI_5G_TXPOWER "$WIFI_5G_SSID" "$WIFI_5G_KEY" 'none'
+	configure_wifi 1 '2g' $WIFI_2G_CHANNEL 'HT20' $WIFI_2G_TXPOWER "$WIFI_2G_SSID" "$WIFI_2G_KEY" 'none'
 }
 
 setup_pppoe() {
@@ -111,4 +120,6 @@ setup_pppoe
 
 if [ "$need_restart" -eq 1 ]; then
 	/etc/init.d/network restart
+	# 有 WiFi 固件：确保首次启动就把无线拉起来（无 WiFi 驱动时静默跳过）
+	wifi up >/dev/null 2>&1 || true
 fi

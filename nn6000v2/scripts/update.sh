@@ -23,7 +23,7 @@ FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
 GOLANG_BRANCH="26.x"
 THEME_SET="argon"
-LAN_ADDR="10.0.0.1"
+LAN_ADDR="192.168.2.1"
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 BASE_PATH=${BASE_PATH:-$(dirname "$SCRIPT_DIR")}
@@ -32,7 +32,6 @@ source "$SCRIPT_DIR/general.sh"
 source "$SCRIPT_DIR/feeds.sh"
 source "$SCRIPT_DIR/packages.sh"
 source "$SCRIPT_DIR/system.sh"
-source "$SCRIPT_DIR/docker.sh"
 
 
 main() {
@@ -41,19 +40,9 @@ main() {
     reset_feeds_conf
     update_feeds
     update_golang
-    clone_quickfile
-    clone_lucky
-    clone_mini_diskmanager
-    clone_dockerman
-    clone_adguardhome
-    install_extra_feed_deps
-    clone_easytier
-    clone_oaf
     clone_luci_tailscale
     clone_homeproxy
     install_feeds
-    fix_smartdns_makefile
-    update_docker_stack
     remove_tweaked_packages
     change_dnsmasq2full
     fix_default_set
@@ -67,21 +56,13 @@ main() {
     update_nss_diag
     fix_compile_coremark
     set_build_signature
-    add_backup_info_to_sysupgrade
     remove_attendedsysupgrade
     fix_rust_compile_error
     fix_kconfig_recursive_dependency
-    set_nginx_default_config
-    update_nginx_ubus_module
-    fix_nginx_configure
-    update_uwsgi_limit_as
     update_script_priority
     fix_openssl_ktls
     fix_opkg_check
     fix_quectel_cm
-    install_pbr_isp
-    fix_pbr_ip_forward
-    fix_quickstart
 }
 
 main "$@"

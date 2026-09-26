@@ -197,6 +197,8 @@ jobs:
           echo "staging: $(du -sh ./action_build/staging_dir 2>/dev/null | cut -f 1 || echo 'N/A')"
 
       - name: Save Build Dependencies Cache
+        # 缓存只是加速手段：超出仓库 10GB 上限或缓存服务抖动时，不该让整次运行标红（此时固件已发布成功）
+        continue-on-error: true
         uses: actions/cache/save@v5.0.4
         with:
           path: |
@@ -218,8 +220,8 @@ jobs:
             echo "## 版本信息"
             echo "- 源码：${{ env.BUILD_SRC }}"
             echo "- Kernel: ${{ env.KVER }}"
-            echo "- WIFI 密码：147258369"
-            echo "- LAN 地址：10.0.0.1"
+            echo "- WIFI 名称：NN6000（2.4G）/ NN6000_5G（5G），开放网络无密码"
+            echo "- LAN 地址：192.168.2.1"
             echo "- 账户：root"
             echo "- 密码：无"
             echo "- no_wifi 后缀的版本未包含 WIFI 驱动程序"
