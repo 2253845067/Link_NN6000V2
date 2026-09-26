@@ -126,6 +126,36 @@ jobs:
             done
           fi
 
+      - name: Install LLVM Toolchain (for eBPF / dae / daed)
+        run: |
+          # include/bpf.mk 需要 clang/llc/opt/llvm-dis/llvm-strip；
+          # bpf-headers 用 LLVM=1 编译内核 BPF 头，还会用到 ld.lld。
+          # 源码构建没有预编译 llvm-bpf，故走 BPF_TOOLCHAIN_HOST 用宿主编译器。
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang llvm lld
+
+          LLVM_PREFIX="$(ls -d /usr/lib/llvm-* 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$LLVM_PREFIX" ]; then
+            echo "::error::no /usr/lib/llvm-* directory found"
+            exit 1
+          fi
+          echo "LLVM_PREFIX=$LLVM_PREFIX"
+
+          # 提前校验，缺任何一个工具就在这里失败（而不是 90 分钟后）
+          for tool in clang llc opt llvm-dis llvm-strip ld.lld; do
+            if [ ! -x "$LLVM_PREFIX/bin/$tool" ]; then
+              echo "::error::$LLVM_PREFIX/bin/$tool is missing"
+              exit 1
+            fi
+          done
+
+          "$LLVM_PREFIX/bin/clang" --version | head -1
+          echo "bpf target check:"
+          "$LLVM_PREFIX/bin/clang" --target=bpfel -dM -E - </dev/null | grep __clang_major__
+
+          sed -i "s#^CONFIG_BPF_TOOLCHAIN_HOST_PATH=.*#CONFIG_BPF_TOOLCHAIN_HOST_PATH=\"$LLVM_PREFIX\"#" ./nn6000v2/configs/link_nn6000v2_immwrt.config
+          grep -E '^CONFIG_BPF_TOOLCHAIN|^CONFIG_DEVEL' ./nn6000v2/configs/link_nn6000v2_immwrt.config
+
       - name: Build Firmware
         run: |
           # 设置 PPPoE 配置
