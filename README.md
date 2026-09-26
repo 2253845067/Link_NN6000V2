@@ -24,10 +24,11 @@
 
 ***
 
-### 2.2 预装插件（6 个）
+### 2.2 预装插件（7 个）
 
 | 插件名称                     | 功能说明          |
 | ------------------------ | ------------- |
+| **luci-app-daede**       | dae / daed 透明代理（eBPF） |
 | **luci-app-argon**       | Argon 主题      |
 | **luci-app-autoreboot**  | 定时重启          |
 | **luci-app-tailscale-community**    | Tailscale 虚拟组网 |
@@ -40,8 +41,11 @@
 ### 2.3 内核 eBPF / XDP 支持
 
 固件内核已启用 XDP socket、cgroup BPF、kprobes 与 BTF（`/sys/kernel/btf/vmlinux`），
-并预置 `kmod-sched-core` / `kmod-sched-bpf` / `kmod-xdp-sockets-diag`，
-可直接安装 `dae` / `daed` 等 eBPF 透明代理插件，无需重新编译固件。
+并预置 `kmod-sched-core` / `kmod-sched-bpf` / `kmod-xdp-sockets-diag`。
+
+已集成 [openwrt-daede](https://github.com/kenzok8/openwrt-daede) 的 `luci-app-daede` +
+`daed`（dae-wing，自带 Web 面板）后端，开箱即用。如需轻量 `dae` 内核或双后端切换，
+在配置中追加 `CONFIG_PACKAGE_dae=y` 即可。
 
 ***
 
