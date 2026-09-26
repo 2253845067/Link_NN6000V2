@@ -24,7 +24,7 @@
 
 ***
 
-### 2.2 预装插件（7 个）
+### 2.2 预装插件（6 个）
 
 | 插件名称                     | 功能说明          |
 | ------------------------ | ------------- |
@@ -34,7 +34,6 @@
 | **luci-app-tailscale-community**    | Tailscale 虚拟组网 |
 | **luci-app-ttyd**        | 终端            |
 | **luci-app-homeproxy**   | 科学上网          |
-| **luci-app-wireguard**   | WireGuard VPN |
 
 ***
 
