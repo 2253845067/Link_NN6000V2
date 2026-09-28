@@ -2,20 +2,28 @@
 # ============================================================
 # 网络初始化配置脚本
 # 首次启动时自动配置 WiFi 和 PPPoE 宽带
+#
+# 执行顺序很重要：/etc/init.d/boot 里是
+#     [ -f /etc/board.json ] && /sbin/wifi config   # 生成 /etc/config/wireless
+#     uci_apply_defaults                            # 才跑 /etc/uci-defaults/*
+# 而 wifi 生成器（wifi-scripts/files/lib/wifi/mac80211.uc）写出的默认值是
+#     ssid=OWRT  encryption=psk2+ccmp  key=12345678  disabled=0
+# 所以本脚本是在"已经生成好的配置"上覆盖。
+# 旧版本用"加密方式不是 none 就跳过"来判断，在 ucode 生成器下永远命中跳过，
+# 导致 SSID/密码从来没生效过（一直显示 OWRT/12345678）。
 # ============================================================
 
 # ==================== WiFi 配置 ====================
-# 5G WiFi 设置
+# 5G
 WIFI_5G_SSID="NN6000_5G"
 WIFI_5G_KEY="12345679"
-WIFI_5G_CHANNEL=36
-WIFI_5G_TXPOWER=24
 
-# 2.4G WiFi 设置
+# 2.4G
 WIFI_2G_SSID="NN6000"
 WIFI_2G_KEY="12345679"
-WIFI_2G_CHANNEL=1
-WIFI_2G_TXPOWER=22
+
+# WPA2-PSK
+WIFI_ENCRYPTION="psk2+ccmp"
 
 # ==================== PPPoE 宽带配置 ====================
 # 填写你的宽带账号密码，使用 "-" 表示跳过配置
@@ -26,52 +34,47 @@ PPPOE_PASSWORD="-"
 
 board_name=$(cat /tmp/sysinfo/board_name 2>/dev/null)
 
-configure_wifi() {
-	local radio=$1
-	local band=$2
-	local channel=$3
-	local htmode=$4
-	local txpower=$5
-	local ssid=$6
-	local key=$7
-	local encryption=${8:-"psk2+ccmp"}
-	local now_encryption=$(uci get wireless.default_radio${radio}.encryption 2>/dev/null)
-	if [ -n "$now_encryption" ] && [ "$now_encryption" != "none" ]; then
-		return 0
-	fi
+# 出厂默认 SSID：命中说明用户还没改过，可以套用我们的默认值；
+# 已经是别的名字说明用户自己改过，升级时保留他的设置。
+is_factory_ssid() {
+	case "$1" in
+		""|OWRT|OpenWrt|ImmortalWrt) return 0 ;;
+		*) return 1 ;;
+	esac
+}
 
-	# 开放网络（encryption=none）不写 key，避免残留旧密码
-	local key_cmd=""
-	if [ "$encryption" = "none" ]; then
-		key_cmd="delete wireless.default_radio${radio}.key"
-	else
-		key_cmd="set wireless.default_radio${radio}.key=\"${key}\""
-	fi
+# 按 radio 的 band 选项匹配（不假定 radio0 是 5G、radio1 是 2.4G，
+# 生成器给 radio 编号的顺序取决于 board.json 里 phy 的枚举顺序）
+configure_wifi() {
+	local dev="$1"
+	local iface="default_${dev}"
+	local band ssid key
+
+	band=$(uci -q get "wireless.${dev}.band")
+	case "$band" in
+		5g) ssid="$WIFI_5G_SSID"; key="$WIFI_5G_KEY" ;;
+		2g) ssid="$WIFI_2G_SSID"; key="$WIFI_2G_KEY" ;;
+		*) return 0 ;;
+	esac
+
+	is_factory_ssid "$(uci -q get "wireless.${iface}.ssid")" || return 0
 
 	uci -q batch <<EOF
-set wireless.radio${radio}.band="${band}"
-set wireless.radio${radio}.channel="${channel}"
-set wireless.radio${radio}.htmode="${htmode}"
-set wireless.radio${radio}.mu_beamformer='1'
-set wireless.radio${radio}.country='US'
-set wireless.radio${radio}.txpower="${txpower}"
-set wireless.radio${radio}.cell_density='0'
-set wireless.radio${radio}.disabled='0'
-set wireless.default_radio${radio}.ssid="${ssid}"
-set wireless.default_radio${radio}.encryption="${encryption}"
-${key_cmd}
-set wireless.default_radio${radio}.ieee80211k='1'
-set wireless.default_radio${radio}.time_advertisement='2'
-set wireless.default_radio${radio}.time_zone='CST-8'
-set wireless.default_radio${radio}.bss_transition='1'
-set wireless.default_radio${radio}.wnm_sleep_mode='1'
-set wireless.default_radio${radio}.wnm_sleep_mode_no_keys='1'
+set wireless.${iface}.ssid="${ssid}"
+set wireless.${iface}.encryption="${WIFI_ENCRYPTION}"
+set wireless.${iface}.key="${key}"
+set wireless.${iface}.disabled='0'
+set wireless.${dev}.disabled='0'
+set wireless.${iface}.ieee80211k='1'
+set wireless.${iface}.bss_transition='1'
 EOF
 }
 
 link_nn6000v2_wifi_cfg() {
-	configure_wifi 0 '5g' $WIFI_5G_CHANNEL 'HE80' $WIFI_5G_TXPOWER "$WIFI_5G_SSID" "$WIFI_5G_KEY"
-	configure_wifi 1 '2g' $WIFI_2G_CHANNEL 'HT20' $WIFI_2G_TXPOWER "$WIFI_2G_SSID" "$WIFI_2G_KEY"
+	local dev
+	for dev in $(uci -q show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.]*\)=wifi-device$/\1/p'); do
+		configure_wifi "$dev"
+	done
 }
 
 setup_pppoe() {
@@ -108,7 +111,7 @@ EOF
 
 need_restart=0
 
-case "${board_name}" in
+case "$${board_name}" in
 link,nn6000-v2)
 	link_nn6000v2_wifi_cfg
 	uci commit wireless
